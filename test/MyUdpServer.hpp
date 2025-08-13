@@ -33,20 +33,56 @@ public:
         }
         LOG(LogLevel::INFO) << "socket create success, sockfd: " << _sockfd ;
         
-        //2.帮i的那个socket信息，ip和端口
-        //2.1 填充sockaddr_in结构体
+        //绑定socket信息，ip和端口
+        //填充sockaddr_in结构体
         struct sockaddr_in local;
         bzero(&local,sizeof(local)); //一个用于内存初始化的函数，主要功能是将指定内存区域的所有字节设置为 0。
-        
         local.sin_family = AF_INET;
+
+        //将端口从本地格式转换成网络序列
         local.sin_port = htons(_port);
-        local.sin_addr.s_addr = 
+        //将IP从string类型转化为4个字节存储，再转化为网络序列：
+        //转成in_addr_t类型 inet_addr (const char *cp)
+        local.sin_addr.s_addr = inet_addr(_ip.c_str());
     
+        //绑定套接字
+        int n = bind(_sockfd, (struct sockaddr*)&local, sizeof(local));
+        if( n < 0 ){
+            LOG(LogLevel::FATAL) << "bind error";
+            exit(2);
+        }
+        //绑定成功，输出日志
+        LOG(LogLevel::INFO) << "bind success, sockfd:" << _sockfd;
+
+        
     }
-    void Start();
+    void Start(){
+        //因为udp不用管链接，一直管收发就好了
+        _isrunning = true;
+        struct sockaddr_in peer;
+        socklen_t len = sizeof(peer);
+        while(_isrunning){
+            char buffer[1024];
+            //1.不断收(读)消息
+            ssize_t rec_msg = recvfrom(_sockfd, buffer, sizeof(buffer)-1, 0, (struct sockaddr* )&peer, &len);
+            //sizeof(buffer)-1 是为了留一个位置将来添加 \n
+            if(rec_msg > 0){
+                //说明收到了消息
+                buffer[rec_msg] = 0;
+                LOG(LogLevel::DEBUG) << "buffer:" << buffer;
+            }
+            
+            //2.发消息
+            std::string snd_msg = "receive message from server：";
+            snd_msg += buffer;
+            ssize_t snd_sz = sendto(_sockfd, snd_msg.c_str(), snd_msg.size(), 0, (struct sockaddr* )&peer, len);
+
+        }
+    }
 
 private:
     int _sockfd;
     uint16_t _port;  // 就是unsigned short int类型重定义了
     std::string _ip; // 这里使用字符串风格存储点分十进制的ip（比如1234.1.2.3）后需要转换成网络字节序
+    bool _isrunning;
 };
