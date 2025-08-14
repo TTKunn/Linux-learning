@@ -1,14 +1,8 @@
 #include "MyUdpServer.hpp"
+#include "Dict.hpp"
 #include <memory>
 #include <iostream>
 
-
-std::string func(const std::string &message)
-{
-    std::string hello = "hello, ";
-    hello += message;
-    return hello + "\n";
-}
 
 // ./myudpserver ip port
 int main(int argc, char* argv[]){
@@ -19,7 +13,14 @@ int main(int argc, char* argv[]){
     // std::string ip = argv[1];
     uint16_t port = std::stoi(argv[1]);
     Enable_Console_Log_Strategy();
-    std::unique_ptr<MyUdpServer> usvr = std::make_unique<MyUdpServer>(port, func);
+
+    //字典对象提供翻译功能
+    Dict dict;
+    dict.Load();
+
+    std::unique_ptr<MyUdpServer> usvr = std::make_unique<MyUdpServer>(port, [&dict](const std::string &message){
+        return dict.Translate(message);
+    });
     usvr->Init();
     usvr->Start();
     return 0;

@@ -31,7 +31,7 @@ int main(int argc, char* argv[]){
         dest_addr.sin_addr.s_addr = inet_addr(argv[1]);
         socklen_t addrlen = sizeof(dest_addr);
 
-        int send_size = sendto(sockfd, input.c_str(),sizeof(input),0,(struct sockaddr*)&dest_addr,addrlen);
+        int send_size = sendto(sockfd, input.c_str(), input.size(), 0, (struct sockaddr*)&dest_addr, addrlen);
     
         char recv_buf[1024];
         sockaddr_in peer_addr;
