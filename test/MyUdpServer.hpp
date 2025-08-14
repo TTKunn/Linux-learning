@@ -9,20 +9,21 @@
 #include <strings.h>
 #include <arpa/inet.h>
 #include "Log.hpp"
+#include <functional>
 
 using namespace LogModule;
+using func_t = std::function<std::string(const std::string&)>;
 
 const int defaultfd = -1;
 
 class MyUdpServer{
 public:
-    MyUdpServer(const std::string &ip,uint16_t port)
+    MyUdpServer(uint16_t port, func_t func)
      :_sockfd(defaultfd),
-      _ip(ip),
-      _port(port)
-    {
-
-    }
+    //   _ip(ip),
+      _port(port),
+      _func(func)
+    {}
 
     void Init(){
         //1.创建套接字
@@ -43,7 +44,10 @@ public:
         local.sin_port = htons(_port);
         //将IP从string类型转化为4个字节存储，再转化为网络序列：
         //转成in_addr_t类型 inet_addr (const char *cp)
-        local.sin_addr.s_addr = inet_addr(_ip.c_str());
+        // local.sin_addr.s_addr = inet_addr(_ip.c_str());
+        // 不用上面的绑定具体ip，使用INADDR_ANY，表示绑定所有网卡
+        local.sin_addr.s_addr = INADDR_ANY;
+        
     
         //绑定套接字
         int n = bind(_sockfd, (struct sockaddr*)&local, sizeof(local));
@@ -68,21 +72,28 @@ public:
             //sizeof(buffer)-1 是为了留一个位置将来添加 \n
             if(rec_msg > 0){
                 //说明收到了消息
-                buffer[rec_msg] = 0;
-                LOG(LogLevel::DEBUG) << "buffer:" << buffer;
-            }
-            
-            //2.发消息
-            std::string snd_msg = "receive message from server：";
-            snd_msg += buffer;
-            ssize_t snd_sz = sendto(_sockfd, snd_msg.c_str(), snd_msg.size(), 0, (struct sockaddr* )&peer, len);
+                int peer_port = ntohs(peer.sin_port);
+                std::string peer_ip = inet_ntoa(peer.sin_addr);
 
+                buffer[rec_msg] = 0;
+
+                std::string result = _func(buffer);
+                LOG(LogLevel::DEBUG) << "buffer:" << buffer << " from " << peer_ip << ":" << peer_port;
+
+                // 2.发消息
+                // std::string snd_msg = "receive message from server：";
+                // snd_msg += buffer;
+                // ssize_t snd_sz = sendto(_sockfd, snd_msg.c_str(), snd_msg.size(), 0, (struct sockaddr *)&peer, len);
+                ssize_t snd_sz = sendto(_sockfd, result.c_str(), result.size(), 0, (struct sockaddr *)&peer, len);
+
+            }
         }
     }
 
 private:
     int _sockfd;
     uint16_t _port;  // 就是unsigned short int类型重定义了
-    std::string _ip; // 这里使用字符串风格存储点分十进制的ip（比如1234.1.2.3）后需要转换成网络字节序
+    // std::string _ip; // 这里使用字符串风格存储点分十进制的ip（比如1234.1.2.3）后需要转换成网络字节序
     bool _isrunning;
+    func_t _func;   //  服务器回调函数，用来对数据进行处理
 };
